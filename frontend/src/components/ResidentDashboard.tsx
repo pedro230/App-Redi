@@ -1,7 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
 import { useMemo } from 'react'
 import LoginCard from './LoginCard'
+import { useFetch } from '../hooks/useFetch'
 
 type Offer = {
   id: number
@@ -18,6 +17,11 @@ type Partner = {
   trade_name: string
   categories: string[]
   city: string
+}
+
+type OfferWithPartner = Offer & {
+  partnerName: string
+  categories: string[]
 }
 
 export default function ResidentDashboard(): JSX.Element {
@@ -37,23 +41,22 @@ export default function ResidentDashboard(): JSX.Element {
     }
   ]
 
-  const { data: offers } = useQuery({
-    queryKey: ['offers'],
-    queryFn: async () => {
-      const response = await axios.get('/api/offers')
-      return response.data as Offer[]
-    }
-  })
+  const {
+    data: offers,
+    loading: offersLoading,
+    error: offersError
+  } = useFetch<Offer[]>('/api/offers', [])
 
-  const { data: partners } = useQuery({
-    queryKey: ['partners'],
-    queryFn: async () => {
-      const response = await axios.get('/api/partners')
-      return response.data as Partner[]
-    }
-  })
+  const {
+    data: partners,
+    loading: partnersLoading,
+    error: partnersError
+  } = useFetch<Partner[]>('/api/partners', [])
 
-  const offersByPartner = useMemo(() => {
+  const isLoading = offersLoading || partnersLoading
+  const errorMessage = offersError ?? partnersError
+
+  const offersByPartner: OfferWithPartner[] = useMemo(() => {
     if (!offers || !partners) return []
     return offers.map((offer) => {
       const partner = partners.find((p) => p.id === offer.partner_id)
@@ -109,27 +112,50 @@ export default function ResidentDashboard(): JSX.Element {
             </div>
           </div>
 
+          {errorMessage && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+              Não foi possível carregar os benefícios no momento: {errorMessage}
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
-            {offersByPartner.map((offer) => (
-              <article key={offer.id} className="border border-resi-emerald/10 rounded-2xl p-6 bg-resi-sand/40">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-2xl font-semibold">{offer.partnerName}</h3>
-                    <p className="text-sm uppercase tracking-wide text-resi-emerald/70">
-                      {offer.categories.join(' • ')}
-                    </p>
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <article
+                  key={`placeholder-${index}`}
+                  className="border border-resi-emerald/10 rounded-2xl p-6 bg-resi-sand/40 animate-pulse"
+                >
+                  <div className="h-6 bg-resi-emerald/20 rounded w-2/3" />
+                  <div className="mt-3 h-4 bg-resi-emerald/10 rounded w-1/2" />
+                  <div className="mt-5 h-20 bg-resi-emerald/10 rounded" />
+                </article>
+              ))
+            ) : offersByPartner.length > 0 ? (
+              offersByPartner.map((offer) => (
+                <article key={offer.id} className="border border-resi-emerald/10 rounded-2xl p-6 bg-resi-sand/40">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-2xl font-semibold">{offer.partnerName}</h3>
+                      <p className="text-sm uppercase tracking-wide text-resi-emerald/70">
+                        {offer.categories.join(' • ')}
+                      </p>
+                    </div>
+                    <span className="bg-resi-emerald/10 text-resi-emerald px-3 py-1 rounded-full text-sm font-medium">
+                      {offer.discount_percent}% OFF
+                    </span>
                   </div>
-                  <span className="bg-resi-emerald/10 text-resi-emerald px-3 py-1 rounded-full text-sm font-medium">
-                    {offer.discount_percent}% OFF
-                  </span>
-                </div>
-                <p className="mt-4 text-resi-emerald/80">{offer.description}</p>
-                <p className="mt-3 text-sm font-medium text-resi-emerald/70">Disponível para níveis {offer.min_level}+.</p>
-                <button className="mt-5 bg-resi-emerald text-white px-4 py-2 rounded-full hover:bg-resi-emerald-light transition-colors">
-                  Gerar QR dinâmico
-                </button>
-              </article>
-            ))}
+                  <p className="mt-4 text-resi-emerald/80">{offer.description}</p>
+                  <p className="mt-3 text-sm font-medium text-resi-emerald/70">Disponível para níveis {offer.min_level}+.</p>
+                  <button className="mt-5 bg-resi-emerald text-white px-4 py-2 rounded-full hover:bg-resi-emerald-light transition-colors">
+                    Gerar QR dinâmico
+                  </button>
+                </article>
+              ))
+            ) : (
+              <div className="col-span-full rounded-2xl border border-resi-emerald/20 bg-white/60 text-resi-emerald/80 p-6 text-center">
+                Nenhum benefício ativo encontrado para o seu nível no momento. Volte em breve!
+              </div>
+            )}
           </div>
         </div>
       </div>

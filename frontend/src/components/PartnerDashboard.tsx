@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
 import LoginCard from './LoginCard'
+import { useFetch } from '../hooks/useFetch'
 
 interface RedemptionMetric {
   partnerName: string
@@ -37,13 +36,11 @@ export default function PartnerDashboard(): JSX.Element {
     }
   ]
 
-  const { data: partners } = useQuery({
-    queryKey: ['partners-dashboard'],
-    queryFn: async () => {
-      const response = await axios.get('/api/partners')
-      return response.data as Array<{ id: number, trade_name: string, plan: string }>
-    }
-  })
+  const {
+    data: partners,
+    loading,
+    error
+  } = useFetch<Array<{ id: number, trade_name: string, plan: string }>>('/api/partners', [])
 
   return (
     <section className="bg-white/80 rounded-3xl shadow-xl p-8 md:p-12 text-resi-emerald">
@@ -92,15 +89,33 @@ export default function PartnerDashboard(): JSX.Element {
 
             <div className="bg-resi-emerald text-white rounded-2xl p-6">
               <h3 className="text-xl font-semibold">Parceiros ativos</h3>
+              {error && (
+                <p className="mt-4 rounded-xl bg-red-50/90 px-4 py-3 text-sm text-red-800">
+                  Não foi possível carregar os dados de parceiros: {error}
+                </p>
+              )}
               <ul className="mt-4 grid sm:grid-cols-2 gap-3 text-resi-sand">
-                {partners?.map((partner) => (
-                  <li key={partner.id} className="bg-white/10 rounded-xl px-4 py-3 flex justify-between items-center">
-                    <span>{partner.trade_name}</span>
-                    <span className="text-xs uppercase tracking-widest bg-resi-emerald-light/30 text-resi-sand px-2 py-1 rounded-full">
-                      {partner.plan}
-                    </span>
-                  </li>
-                ))}
+                {loading
+                  ? Array.from({ length: 4 }).map((_, index) => (
+                      <li key={`skeleton-${index}`} className="bg-white/10 rounded-xl px-4 py-3 animate-pulse">
+                        <div className="h-4 bg-white/40 rounded w-3/4" />
+                        <div className="mt-3 h-3 bg-white/30 rounded w-1/3" />
+                      </li>
+                    ))
+                  : partners.length > 0
+                    ? partners.map((partner) => (
+                        <li key={partner.id} className="bg-white/10 rounded-xl px-4 py-3 flex justify-between items-center">
+                          <span>{partner.trade_name}</span>
+                          <span className="text-xs uppercase tracking-widest bg-resi-emerald-light/30 text-resi-sand px-2 py-1 rounded-full">
+                            {partner.plan}
+                          </span>
+                        </li>
+                      ))
+                    : (
+                        <li className="col-span-full bg-white/10 rounded-xl px-4 py-3 text-center">
+                          Nenhum parceiro ativo cadastrado para exibição.
+                        </li>
+                      )}
               </ul>
             </div>
           </div>
